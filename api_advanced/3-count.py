@@ -1,32 +1,41 @@
 #!/usr/bin/python3
 """Recursively count keywords in Reddit hot post titles."""
 
-import re
 import requests
 
 
 def count_words(subreddit, word_list, after=None, counts=None):
     """Count keywords and print results in descending order."""
+
     if counts is None:
         counts = {}
 
         for word in word_list:
             keyword = word.lower()
-            counts[keyword] = counts.get(keyword, 0)
+            if keyword not in counts:
+                counts[keyword] = [0, 0]
+            counts[keyword][0] += 1
 
     url = "https://www.reddit.com/r/{}/hot.json".format(subreddit)
-    headers = {"User-Agent": "ALU_API_Advanced/1.0"}
+
+    headers = {
+        "User-Agent": "ALU_API_Advanced/1.0"
+    }
+
     params = {"limit": 100}
 
     if after is not None:
         params["after"] = after
 
-    response = requests.get(
-        url,
-        headers=headers,
-        params=params,
-        allow_redirects=False
-    )
+    try:
+        response = requests.get(
+            url,
+            headers=headers,
+            params=params,
+            allow_redirects=False
+        )
+    except requests.RequestException:
+        return
 
     if response.status_code != 200:
         return
@@ -41,12 +50,9 @@ def count_words(subreddit, word_list, after=None, counts=None):
     for post in posts:
         title = post.get("data", {}).get("title", "").lower()
 
-        for keyword in counts:
-            pattern = r"(?<![a-zA-Z0-9_])" + re.escape(keyword)
-            pattern += r"(?![a-zA-Z0-9_])"
-
-            matches = re.findall(pattern, title)
-            counts[keyword] += len(matches) * word_list.count(keyword)
+        for word in title.split():
+            if word in counts:
+                counts[word][1] += counts[word][0]
 
     after = data.get("after")
 
@@ -54,9 +60,9 @@ def count_words(subreddit, word_list, after=None, counts=None):
         return count_words(subreddit, word_list, after, counts)
 
     results = [
-        (word, count)
-        for word, count in counts.items()
-        if count > 0
+        (word, values[1])
+        for word, values in counts.items()
+        if values[1] > 0
     ]
 
     results.sort(key=lambda item: (-item[1], item[0]))
